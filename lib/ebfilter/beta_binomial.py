@@ -3,6 +3,7 @@
 import math
 import numpy
 import scipy.optimize
+from functools import reduce
 
 def beta_binomial_density(params, n, k):
 
