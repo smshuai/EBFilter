@@ -1,0 +1,11 @@
+miniBAM:
+  class: File
+  path: 
+U1BED:
+  class: File
+  path:
+U1CORE:
+  class: File
+  path:
+ID: 
+OUT: 

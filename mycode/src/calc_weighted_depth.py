@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 ''' Calculate weighted depth based on re-alignments
 Usage: calc_weighted_depth.py bam map_stat umapper U1_bed id out
 '''

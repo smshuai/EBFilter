@@ -18,6 +18,7 @@ else:
     sys.stderr.write("Usage: bam2fq_for_realign.py miniBAM U1_BED [OUT_PREFIX]")
     sys.exit(1)
 
+mq_cut = 100  # reads < mapq_cut will be realigned
 
 bam_tmp = os.path.splitext(bam_in)[0] + '.tmp.bam'
 # Remove duplicates (1024)
@@ -53,17 +54,18 @@ bed['PAIRED'] = np.logical_and(bed['SELF'], bed['MATE'])  # Whether the pair can
 # Remove reads that are not in FASTQ
 bed = bed[bed.SELF]
 # Record names for re-align reads
-keep = np.logical_and(bed['PAIRED'], bed['score']<30)  # Realign reads with MAPQ<=30
+keep = np.logical_and(bed['PAIRED'], bed['score'] < mq_cut)  # Realign reads with MAPQ < cut
 use_qname = bed.loc[keep, ].QNAME.unique()
-unpair_lowmq_qname = bed.loc[np.logical_and(np.logical_not(bed['PAIRED']), bed['score']<30), ].SELF_NAME.unique()
+unpair_lowmq_qname = bed.loc[np.logical_and(np.logical_not(bed['PAIRED']), bed['score'] < mq_cut), ].SELF_NAME.unique()
 # Print summary stat
 print('Total number of reads:', len(read_names))
 print('Total number of reads in BED:', bed['SELF'].sum())
 print('Total number of paired reads in BED:', bed['PAIRED'].sum())
-print('---> MAPQ>30:', np.logical_and(bed['PAIRED'], bed['score']>=30).sum(), 'and MAPQ<30:', np.sum(keep))
+print('---> MAPQ>{}:'.format(mq_cut), np.logical_and(bed['PAIRED'], bed['score']>=mq_cut).sum(),
+'and MAPQ<{}:'.format(mq_cut), np.sum(keep))
 print('Total number of unpaired reads in BED:', np.logical_not(bed['PAIRED']).sum())
-print('---> MAPQ>30:', np.logical_and(np.logical_not(bed['PAIRED']), bed['score']>=30).sum(),
-      'and MAPQ<30:', np.logical_and(np.logical_not(bed['PAIRED']), bed['score']<30).sum())
+print('---> MAPQ>{}:'.format(mq_cut), np.logical_and(np.logical_not(bed['PAIRED']), bed['score']>=mq_cut).sum(),
+      'and MAPQ<{}:'.format(mq_cut), np.logical_and(np.logical_not(bed['PAIRED']), bed['score']<mq_cut).sum())
 print('Total Number of paired reads to be re-aligned:', len(use_qname)*2)
 print('Total Number of unpaired reads to be re-aligned:', len(unpair_lowmq_qname))
 # Make FASTQ for realignments
