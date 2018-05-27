@@ -106,8 +106,12 @@ def test_base(Ks_p, Ns_p, Ks_n, Ns_n, k_p, n_p, k_n, n_n):
     n_p = np.int(n_p)
     n_n = np.int(n_n)
     # Filter Ks and Ns by coverage (>=5 reads) and validity (Ks/Ns < 0.5)
-    keep_p = np.logical_and(Ns_p>=5, Ks_p / (Ns_p + 0.1) < 0.5)
-    keep_n = np.logical_and(Ns_n>=5, Ks_n / (Ns_n + 0.1) < 0.5)
+    keep_p = np.flatnonzero(np.logical_and(Ns_p>=5, Ks_p / (Ns_p + 0.1) < 0.5))
+    keep_n = np.flatnonzero(np.logical_and(Ns_n>=5, Ks_n / (Ns_n + 0.1) < 0.5))
+    # If >100 samples, use 100 samples
+    keep_p = np.random.choice(keep_p, 100, replace=False) if keep_p.shape[0] > 100 else keep_p
+    keep_n = np.random.choice(keep_n, 100, replace=False) if keep_n.shape[0] > 100 else keep_n
+    # Avoid that # success > # trials
     if k_p > n_p:
         k_p = n_p
     if k_n > n_n:
@@ -126,7 +130,7 @@ def test_base(Ks_p, Ns_p, Ks_n, Ns_n, k_p, n_p, k_n, n_n):
         EB_score = 0
     else:
         EB_score = - round(np.log10(pval), 3)
-    return EB_score, np.sum(keep_p), np.sum(keep_n)
+    return EB_score, keep_p.shape[0], keep_n.shape[0]
 
 
 if __name__ == '__main__':
@@ -203,8 +207,9 @@ if __name__ == '__main__':
     normal_depth['num_p'] = num_normal_p
     normal_depth['num_n'] = num_normal_n
     res = pd.merge(tumour_depth, normal_depth, on=('chrom', 'pos', 'ref', 'alt', 'id', 'start', 'end', 'gene', 'strand'), suffixes=('_tumour', '_normal'))
-    Mut = np.logical_and(res.EB_tumour-res.EB_normal>5, res.EB_tumour>5)
-    Mut = np.logical_and(Mut, res.EB_normal<2)
+    # Mut = np.logical_and(res.EB_tumour-res.EB_normal>3, res.EB_tumour>5)
+    # Mut = np.logical_and(Mut, res.EB_normal<2)
+    Mut = np.logical_and(res.EB_normal<2, res.EB_tumour>5)
     res['GT'] = 'WT'
     res.loc[Mut, 'GT'] = 'MUT'
     res.loc[res.totDP_tumour < 12, 'GT'] = 'undet'
