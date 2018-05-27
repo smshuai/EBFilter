@@ -4,6 +4,8 @@ import pysam, sys, os
 import numpy as np
 from pybedtools import BedTool
 
+mq_cut = 30
+
 # Input
 if len(sys.argv) == 5:
     realnBAM = sys.argv[1] # bowtie2 re-aligned bam (rbam for short)
@@ -50,7 +52,7 @@ with open(out_prefix + '.processed.sam', 'w') as out:
     with pysam.Samfile(obam_U1U11.fn, 'rb') as obam:
         out.write(str(obam.header))
         for read in obam:
-            if read.mapq >= 30:
+            if read.mapq >= mq_cut:
                 read_name = read.qname + '/2' if read.is_read2 else read.qname + '/1'
                 umap_reads.append(read_name)  # store names of unique mapping reads
                 out.write(read.to_string() + '\n')

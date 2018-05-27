@@ -203,8 +203,8 @@ if __name__ == '__main__':
     normal_depth['num_p'] = num_normal_p
     normal_depth['num_n'] = num_normal_n
     res = pd.merge(tumour_depth, normal_depth, on=('chrom', 'pos', 'ref', 'alt', 'id', 'start', 'end', 'gene', 'strand'), suffixes=('_tumour', '_normal'))
-    Mut = np.logical_and(res.EB_tumour-res.EB_normal>3, res.EB_tumour>5)
-    Mut = np.logical_and(Mut, res.EB_normal<3)
+    Mut = np.logical_and(res.EB_tumour-res.EB_normal>5, res.EB_tumour>5)
+    Mut = np.logical_and(Mut, res.EB_normal<2)
     res['GT'] = 'WT'
     res.loc[Mut, 'GT'] = 'MUT'
     res.loc[res.totDP_tumour < 12, 'GT'] = 'undet'
