@@ -90,47 +90,54 @@ def calc_bb_pval(Ks, Ns, k, n):
     return pval
 
 
-def test_base(Ks_p, Ns_p, Ks_n, Ns_n, k_p, n_p, k_n, n_n):
-    """ Use beta binomial model to call mutation for the base
-    Training data based on normal panels: Ks_p, Ns_p, Ks_n, Ns_n
-    Test data from tumour: k_p, n_p, k_n, n_n
-    """
-    # Convert data to int
-    arraytoint = lambda x: x.round().astype(np.int)
-    Ks_p = arraytoint(Ks_p)
-    Ns_p = arraytoint(Ns_p)
-    Ks_n = arraytoint(Ks_n)
-    Ns_n = arraytoint(Ns_n)
-    k_p = np.int(k_p)
-    k_n = np.int(k_n)
-    n_p = np.int(n_p)
-    n_n = np.int(n_n)
-    # Filter Ks and Ns by coverage (>=5 reads) and validity (Ks/Ns < 0.5)
-    keep_p = np.flatnonzero(np.logical_and(Ns_p>=15, Ks_p / (Ns_p + 0.1) < 0.5))
-    keep_n = np.flatnonzero(np.logical_and(Ns_n>=15, Ks_n / (Ns_n + 0.1) < 0.5))
-    # If >50 samples, use 50 samples
-    keep_p = np.random.choice(keep_p, 50, replace=False) if keep_p.shape[0] > 50 else keep_p
-    keep_n = np.random.choice(keep_n, 50, replace=False) if keep_n.shape[0] > 50 else keep_n
-    # Avoid that # success > # trials
-    if k_p > n_p:
-        k_p = n_p
-    if k_n > n_n:
-        k_n = n_n
-    pval_p = calc_bb_pval(Ks_p[keep_p], Ns_p[keep_p], k_p, n_p)
-    pval_n = calc_bb_pval(Ks_n[keep_n], Ns_n[keep_n], k_n, n_n)
-    if pval_p < 1e-60:
-        pval_p = 1e-60  # Cap p-val
-    if pval_n < 1e-60:
-        pval_n = 1e-60
-    pval = combine_pvalues([pval_p, pval_n], 'fisher')[1]
-    EB_score = 0
+def pval_to_eb(pval):
     if pval < 1e-60:
         EB_score = 60
     elif pval > 1.0 - 1e-10:
         EB_score = 0
     else:
         EB_score = - round(np.log10(pval), 3)
-    return EB_score, keep_p.shape[0], keep_n.shape[0]
+    return EB_score
+
+
+def test_base(Ks_p, Ns_p, Ks_n, Ns_n, k_pt, n_pt, k_nt, n_nt, k_pn, n_pn, k_nn, n_nn):
+    """ Use beta binomial model to call mutation for the base
+    Training data based on unpaired normal panels: Ks_p, Ns_p, Ks_n, Ns_n
+    Test data from tumour: k_pt, n_pt, k_nt, n_nt
+    Test data from paired normal: k_pn, n_pn, k_nn, n_nn
+    """
+    # Convert data to int
+    arraytoint = lambda x: x.round().astype(np.int)
+    Ks_p = arraytoint(Ks_p); Ns_p = arraytoint(Ns_p); Ks_n = arraytoint(Ks_n); Ns_n = arraytoint(Ns_n)
+    k_pt = np.int(k_pt); k_nt = np.int(k_nt); n_pt = np.int(n_pt); n_nt = np.int(n_nt)
+    k_pn = np.int(k_pn); k_nn = np.int(k_nn); n_pn = np.int(n_pn); n_nn = np.int(n_nn)
+    # Filter Ks and Ns by coverage (>=12 reads) and validity (Ks/Ns < 0.5)
+    keep_p = np.flatnonzero(np.logical_and(Ns_p>=12, Ks_p / (Ns_p + 0.1) < 0.5))
+    keep_n = np.flatnonzero(np.logical_and(Ns_n>=12, Ks_n / (Ns_n + 0.1) < 0.5))
+    # Don't need too many training normals
+    keep_p = np.random.choice(keep_p, 50, replace=False) if keep_p.shape[0] > 50 else keep_p
+    keep_n = np.random.choice(keep_n, 50, replace=False) if keep_n.shape[0] > 50 else keep_n
+    # Avoid that # success > # trials
+    if k_pt > n_pt:
+        k_pt = n_pt
+    if k_nt > n_nt:
+        k_nt = n_nt
+    if k_pn > n_pn:
+        k_pn = n_pn
+    if k_nt > n_nt:
+        k_nn = n_nn
+    # fit model and test
+    fitp = fit_beta_binomial(Ks_p[keep_p], Ns_p[keep_p])
+    fitn = fit_beta_binomial(Ks_n[keep_n], Ns_n[keep_n])
+    pval_pt = beta_binom_pvalue(fitp, k_pt, n_pt)
+    pval_nt = beta_binom_pvalue(fitn, k_nt, n_nt)
+    pval_pn = beta_binom_pvalue(fitp, k_pn, n_pn)
+    pval_nn = beta_binom_pvalue(fitn, k_nn, n_nn)
+    cap_pval = lambda p: 1e-60 if p < 1e-60 else p
+    pvalt = combine_pvalues([cap_pval(pval_pt), cap_pval(pval_nt)], 'fisher')[1]
+    pvaln = combine_pvalues([cap_pval(pval_pn), cap_pval(pval_nn)], 'fisher')[1]
+    ebt = pval_to_eb(pvalt); ebn = pval_to_eb(pvaln)
+    return ebt, ebn, keep_p.shape[0], keep_n.shape[0]
 
 
 if __name__ == '__main__':
@@ -160,56 +167,44 @@ if __name__ == '__main__':
     normal_depth = normal_depth.loc[normal_depth.ref != normal_depth.alt]
     normal_depth['varDP'] = normal_depth.varP + normal_depth.varN
     normal_depth['totDP'] = normal_depth.dpP + normal_depth.dpN
-    # Test for tumour sample
-    eb_scores = []
-    num_normal_p = []  # number of normal samples used in model for pos strand
-    num_normal_n = []  # number of normal samples used in model for neg strand
-    for ix, row in tumour_depth.iterrows():
-        if row.varDP > 0:
-            k_p, n_p, k_n, n_n = row[['varP', 'dpP', 'varN', 'dpN']]
-            Ks_p = normal_panel.loc[(row.chrom, row.pos, row.alt), 'varP'].values
-            Ns_p = normal_panel.loc[(row.chrom, row.pos, row.alt), 'dpP'].values
-            Ks_n = normal_panel.loc[(row.chrom, row.pos, row.alt), 'varN'].values
-            Ns_n = normal_panel.loc[(row.chrom, row.pos, row.alt), 'dpP'].values
-            eb, num_p, num_n = test_base(Ks_p, Ns_p, Ks_n, Ns_n, k_p, n_p, k_n, n_n)
-            eb_scores.append(eb)
-            num_normal_p.append(num_p)
-            num_normal_n.append(num_n)
-        else:
-            # No variant read
-            eb_scores.append(0)
-            num_normal_p.append(np.nan)
-            num_normal_n.append(np.nan)            
-    tumour_depth['EB'] = eb_scores
-    tumour_depth['num_p'] = num_normal_p
-    tumour_depth['num_n'] = num_normal_n
-    # Repeat the same analysis for paired normal
-    eb_scores = []
-    num_normal_p = []  # number of normal samples used in model for pos strand
-    num_normal_n = []  # number of normal samples used in model for neg strand
-    for ix, row in normal_depth.iterrows():
-        if row.varDP > 0:
-            k_p, n_p, k_n, n_n = row[['varP', 'dpP', 'varN', 'dpN']]
-            Ks_p = normal_panel.loc[(row.chrom, row.pos, row.alt), 'varP'].values
-            Ns_p = normal_panel.loc[(row.chrom, row.pos, row.alt), 'dpP'].values
-            Ks_n = normal_panel.loc[(row.chrom, row.pos, row.alt), 'varN'].values
-            Ns_n = normal_panel.loc[(row.chrom, row.pos, row.alt), 'dpP'].values
-            eb, num_p, num_n = test_base(Ks_p, Ns_p, Ks_n, Ns_n, k_p, n_p, k_n, n_n)
-            eb_scores.append(eb)
-            num_normal_p.append(num_p)
-            num_normal_n.append(num_n)
-        else:
-            # No variant read
-            eb_scores.append(0)
-            num_normal_p.append(np.nan)
-            num_normal_n.append(np.nan)
-    normal_depth['EB'] = eb_scores
-    normal_depth['num_p'] = num_normal_p
-    normal_depth['num_n'] = num_normal_n
+    # Merge tumour_depth and normal_depth
     res = pd.merge(tumour_depth, normal_depth, on=('chrom', 'pos', 'ref', 'alt', 'id', 'start', 'end', 'gene', 'strand'), suffixes=('_tumour', '_normal'))
-    # Mut = np.logical_and(res.EB_tumour-res.EB_normal>3, res.EB_tumour>5)
-    # Mut = np.logical_and(Mut, res.EB_normal<2)
-    Mut = np.logical_and(res.EB_normal<2, res.EB_tumour>5)
+    # Test for tumour and normal sample
+    eb_scores_tumour = []
+    eb_scores_normal = []
+    num_normal_p = []  # number of normal samples used in model for pos strand
+    num_normal_n = []  # number of normal samples used in model for neg strand
+    for ix, row in res.iterrows():
+        # Only test when tumour has variant reads
+        if row.varDP_tumour > 0:
+            # Get observed number (k_pt: # variant for + strand and tumour)
+            k_pt, n_pt, k_nt, n_nt = row[['varP_tumour', 'dpP_tumour', 'varN_tumour', 'dpN_tumour']]
+            k_pn, n_pn, k_nn, n_nn = row[['varP_normal', 'dpP_normal', 'varN_normal', 'dpN_normal']]
+            # Get normal panel depths
+            Ks_p = normal_panel.loc[(row.chrom, row.pos, row.alt), 'varP'].values
+            Ns_p = normal_panel.loc[(row.chrom, row.pos, row.alt), 'dpP'].values
+            Ks_n = normal_panel.loc[(row.chrom, row.pos, row.alt), 'varN'].values
+            Ns_n = normal_panel.loc[(row.chrom, row.pos, row.alt), 'dpP'].values
+            # Test tumour and normal with the same model
+            ebt, ebn, num_p, num_n = test_base(Ks_p, Ns_p, Ks_n, Ns_n, k_pt, n_pt, k_nt, n_nt, k_pn, n_pn, k_nn, n_nn)
+            eb_scores_tumour.append(ebt)
+            eb_scores_normal.append(ebn)
+            num_normal_p.append(num_p)
+            num_normal_n.append(num_n)
+        else:
+            # No variant read
+            eb_scores_tumour.append(0)
+            eb_scores_normal.append(0)
+            num_normal_p.append(np.nan)
+            num_normal_n.append(np.nan)      
+    res['num_p'] = num_normal_p
+    res['num_n'] = num_normal_n
+    res['EB_tumour'] = eb_scores_tumour
+    res['EB_normal'] = eb_scores_normal
+    res['EB_delta'] = res.EB_tumour.subtract(res.EB_normal)
+    Mut = np.logical_and(res.EB_normal<3, res.EB_tumour>5)
+    Mut = np.logical_and(Mut, res.EB_delta>3)
+    # Mut = np.logical_and(res.EB_normal<3, res.EB_tumour>5)
     res['GT'] = 'WT'
     res.loc[Mut, 'GT'] = 'MUT'
     res.loc[res.totDP_tumour < 12, 'GT'] = 'undet'
