@@ -4,7 +4,7 @@ import pysam, sys, os
 import numpy as np
 from pybedtools import BedTool
 
-mq_cut = 30
+mq_cut = 100
 
 # Input
 if len(sys.argv) == 5:

@@ -18,7 +18,7 @@ else:
     sys.stderr.write("Usage: bam2fq_for_realign.py miniBAM U1_BED [OUT_PREFIX]")
     sys.exit(1)
 
-mq_cut = 30  # reads < mapq_cut will be realigned
+mq_cut = 100  # reads < mapq_cut will be realigned
 
 bam_tmp = os.path.splitext(bam_in)[0] + '.tmp.bam'
 # Remove duplicates (1024)
