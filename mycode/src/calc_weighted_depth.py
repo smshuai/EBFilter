@@ -118,7 +118,7 @@ def varWeightedCountCheck(var, depth, baseBar, weights, verbose):
     if var in "ACGTacgt":
         # variant is SNV
         misMatch_p = base_num[var.upper()]
-        misMatch_n = base_num[var.lower()]    
+        misMatch_n = base_num[var.lower()]
     else:
         if var[0] == "+":
             # variant is INS
@@ -135,7 +135,7 @@ def varWeightedCountCheck(var, depth, baseBar, weights, verbose):
         else:
             sys.stderr.write(var + ": input var has wrong format!")
             sys.exit(1)
-    return [misMatch_p, depth_p, misMatch_n, depth_n]
+    return [int(misMatch_p), int(depth_p), int(misMatch_n), int(depth_n)]
 
 def run_subprocess(cmd):
     exit_status = subprocess.call(cmd, shell=True)
@@ -189,7 +189,7 @@ if __name__ == '__main__':
     else:
         # No weight
         cmd = 'samtools mpileup -l {} -d 1000000 --ff UNMAP,QCFAIL,DUP -a -Q 15 {} > {}'.format(U1U11, bam, bam + '.pileup')
-        rub_subprocess(cmd)
+        run_subprocess(cmd)
         # Process pileup
         results = pileup2dict_noweight(bam + '.pileup', results)
     res_DF = pd.DataFrame(results).T.reset_index()
