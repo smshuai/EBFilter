@@ -7,6 +7,7 @@ from scipy.optimize import fmin_l_bfgs_b
 from scipy.special import betaln
 from scipy.stats import combine_pvalues
 
+N_normal = 20 # maximum number of normal samples to use in fitting
 
 def get_args():
     ''' Process argmuents
@@ -106,6 +107,7 @@ def test_base(Ks_p, Ns_p, Ks_n, Ns_n, k_pt, n_pt, k_nt, n_nt, k_pn, n_pn, k_nn, 
     Test data from tumour: k_pt, n_pt, k_nt, n_nt
     Test data from paired normal: k_pn, n_pn, k_nn, n_nn
     """
+    global N_normal
     # Convert data to int
     arraytoint = lambda x: x.round().astype(np.int)
     Ks_p = arraytoint(Ks_p); Ns_p = arraytoint(Ns_p); Ks_n = arraytoint(Ks_n); Ns_n = arraytoint(Ns_n)
@@ -115,8 +117,8 @@ def test_base(Ks_p, Ns_p, Ks_n, Ns_n, k_pt, n_pt, k_nt, n_nt, k_pn, n_pn, k_nn, 
     keep_p = np.flatnonzero(np.logical_and(Ns_p>=12, Ks_p / (Ns_p + 0.1) < 0.5))
     keep_n = np.flatnonzero(np.logical_and(Ns_n>=12, Ks_n / (Ns_n + 0.1) < 0.5))
     # Don't need too many training normals
-    keep_p = np.random.choice(keep_p, 50, replace=False) if keep_p.shape[0] > 50 else keep_p
-    keep_n = np.random.choice(keep_n, 50, replace=False) if keep_n.shape[0] > 50 else keep_n
+    keep_p = np.random.choice(keep_p, N_normal, replace=False) if keep_p.shape[0] > N_normal else keep_p
+    keep_n = np.random.choice(keep_n, N_normal, replace=False) if keep_n.shape[0] > N_normal else keep_n
     # Avoid that # success > # trials
     if k_pt > n_pt:
         k_pt = n_pt
