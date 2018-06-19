@@ -139,7 +139,7 @@ def test_base(Ks_p, Ns_p, Ks_n, Ns_n, k_pt, n_pt, k_nt, n_nt, k_pn, n_pn, k_nn, 
     pvalt = combine_pvalues([cap_pval(pval_pt), cap_pval(pval_nt)], 'fisher')[1]
     pvaln = combine_pvalues([cap_pval(pval_pn), cap_pval(pval_nn)], 'fisher')[1]
     ebt = pval_to_eb(pvalt); ebn = pval_to_eb(pvaln)
-    return ebt, ebn, keep_p.shape[0], keep_n.shape[0]
+    return ebt, ebn, int(keep_p.shape[0]), int(keep_n.shape[0])
 
 
 if __name__ == '__main__':
