@@ -7,7 +7,7 @@ from scipy.optimize import fmin_l_bfgs_b
 from scipy.special import betaln
 from scipy.stats import combine_pvalues
 
-N_normal = 20 # maximum number of normal samples to use in fitting
+N_normal = 50 # maximum number of normal samples to use in fitting
 
 def get_args():
     ''' Process argmuents

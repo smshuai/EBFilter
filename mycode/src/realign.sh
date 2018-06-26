@@ -36,6 +36,6 @@ python $POSTPROCESS ${OUT}_realign.bam $miniBAM $OUT $U1BED
 ### PART 3
 ### Make weighted depth table
 #################
-python $CALCDP ${OUT}_processed.bam ${OUT}_mstat.csv ${OUT}_umap.txt $U1CORE $donorID ${OUT}_weighted_dp.tsv
+python $CALCDP ${OUT}_processed.bam $U1CORE $donorID ${OUT}_weighted_dp.tsv ${OUT}_mstat.csv ${OUT}_umap.txt
 ## Clean up
 rm ${OUT}_1.fq ${OUT}_2.fq ${OUT}_unpair.fq ${OUT}_realign.sam
