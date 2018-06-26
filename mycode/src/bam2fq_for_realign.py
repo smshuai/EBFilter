@@ -24,7 +24,7 @@ bam_tmp = os.path.splitext(bam_in)[0] + '.tmp.bam'
 # Remove duplicates (1024)
 pysam.view('-o', bam_tmp, '-uF', '1024', '-f', '1', bam_in, catch_stdout=False)
 # Convert miniBAM to FASTQ
-fq = pysam.fastq(bam_tmp).split('\n')
+fq = pysam.fastq('-O', bam_tmp).split('\n')
 # Convert FASTQ to dict
 fq_dict = {}
 for i in range(len(fq)):
