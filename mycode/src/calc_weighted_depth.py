@@ -12,31 +12,28 @@ ReStart = re.compile('\^.')
 ReEnd = re.compile('\$')
 
 def process_args():
-    #
-    if len(sys.argv) == 7:
+    if len(sys.argv) == 6:
         bam = sys.argv[1]
         U1U11 = sys.argv[2]
         donor_id = sys.argv[3]
         out_path = sys.argv[4]
         mstat = pd.read_csv(sys.argv[5], index_col='name')
-        umap = np.loadtxt(sys.argv[6], np.str, comments=None)
         use_weight = 'yes'
-        return bam, mstat, umap, U1U11, donor_id, out_path, use_weight
+        return bam, mstat, U1U11, donor_id, out_path, use_weight
     elif len(sys.argv) == 5:
         bam = sys.argv[1]
         U1U11 = sys.argv[2]
         donor_id = sys.argv[3]
         out_path = sys.argv[4]
         use_weight = 'no'
-        return bam, None, None, U1U11, donor_id, out_path, use_weight
+        return bam, None, U1U11, donor_id, out_path, use_weight
     else:
-        sys.stderr.write('Usage: calc_weighted_depth.py BAM U1_bed ID OUT [map_stat] [umapper]\n')
+        sys.stderr.write('Usage: calc_weighted_depth.py BAM U1_bed ID OUT [map_stat]\n')
         sys.stderr.write('\t- BAM: miniBAM file\n')
         sys.stderr.write('\t- U1_bed: BED file for U1/U11 genes\n')
         sys.stderr.write('\t- ID: sample identifier, also used as output prefix\n')
         sys.stderr.write('\t- OUT: path for output file\n')
         sys.stderr.write('\t- map_stat: (optional) Mapping statistics from post-processing step\n')
-        sys.stderr.write('\t- umapper: (optional) Names of unique mapping reads from post-processing step\n')
         sys.exit(1)
 
 def get_weights(depth, readBar, ct):
@@ -167,7 +164,7 @@ def pileup2dict_noweight(pileup, results):
 
 if __name__ == '__main__':
     # Get arguments
-    bam, mstat, umap, U1U11, donor_id, out_path, use_weight = process_args()
+    bam, mstat, U1U11, donor_id, out_path, use_weight = process_args()
     results = dict()
     if use_weight is 'yes':
         # Make three pileup files (/1, /2, unpair)
@@ -176,9 +173,9 @@ if __name__ == '__main__':
         run_subprocess(cmd1)
         run_subprocess(cmd2)
         # Process /1 pileup
-        results = pileup2dict(bam + '_1.pileup', '/1', results, mstat, umap)
+        results = pileup2dict(bam + '_1.pileup', '/1', results, mstat)
         # Process /2 pileup
-        results = pileup2dict(bam + '_2.pileup', '/2', results, mstat, umap)
+        results = pileup2dict(bam + '_2.pileup', '/2', results, mstat)
     else:
         # No weight
         cmd = 'samtools mpileup -l {} -d 1000000 --ff UNMAP,QCFAIL -a -Q 15 {} > {}'.format(U1U11, bam, bam + '.pileup')
@@ -194,6 +191,5 @@ if __name__ == '__main__':
     if use_weight is 'yes':
         os.remove(bam + '_1.pileup')
         os.remove(bam + '_2.pileup')
-        os.remove(bam + '_3.pileup')
     else:
         os.remove(bam + '.pileup')
