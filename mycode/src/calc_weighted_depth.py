@@ -39,18 +39,15 @@ def process_args():
         sys.stderr.write('\t- umapper: (optional) Names of unique mapping reads from post-processing step\n')
         sys.exit(1)
 
-def get_weights(depth, readBar, ct, umap):
-    ''' Use readBar (array of read names), ct (number of times a read maps) and umap (array of umap names)
-    to get weights for each read
+def get_weights(depth, readBar, ct):
+    ''' Use readBar (array of read names), ct (number of times a read maps) to get weights for each read
     '''
     if depth == 0:
         return
     weights = []
     for read in readBar:
-        if read in umap:
-            weights.append(1)
-        elif read in ct.index:
-            w = 0 if ct.loc[read, 'Other'] > 0 else ct.loc[read, 'U1_map']  # reads mapped to other regions are ignored
+        if read in ct.index:
+            w = 0 if ct.loc[read, 'Other'] > 0 else ct.loc[read, 'U1U11_map']  # reads mapped to other regions are ignored
             weights.append(int(w))
         else:
             sys.stderr('Read not in umap or mmap:', read)
@@ -143,13 +140,13 @@ def run_subprocess(cmd):
         sys.stderr.write('Failed:', cmd)
         sys.exit(1)
 
-def pileup2dict(pileup, mate_order, results, mstat, umap):
+def pileup2dict(pileup, mate_order, results, mstat):
     with open(pileup) as f:
         for pp in f:
             (chrom, pos, _, depth, baseBar, _, readBar) = pp.strip().split('\t')
             depth = int(depth)
             readBar = [i + mate_order for i in readBar.split(',')]
-            weights = get_weights(depth, readBar, mstat, umap)
+            weights = get_weights(depth, readBar, mstat)
             for var in 'ACGT':
                 key = (chrom, pos, var)
                 counts = varWeightedCountCheck(var, depth, baseBar, weights, False)
@@ -174,21 +171,17 @@ if __name__ == '__main__':
     results = dict()
     if use_weight is 'yes':
         # Make three pileup files (/1, /2, unpair)
-        cmd1 = 'samtools mpileup -l {} -d 1000000 --rf 64 --ff UNMAP,QCFAIL,DUP -a --output-QNAME -Q 15 {} > {}'.format(U1U11, bam, bam + '_1.pileup')
-        cmd2 = 'samtools mpileup -l {} -d 1000000 --rf 128 --ff UNMAP,QCFAIL,DUP -a --output-QNAME -Q 15 {} > {}'.format(U1U11, bam, bam + '_2.pileup')
-        cmd3 = 'samtools mpileup -l {} -d 1000000 --ff 1,UNMAP,QCFAIL,DUP -a --output-QNAME -Q 15 {} > {}'.format(U1U11, bam, bam + '_3.pileup')
+        cmd1 = 'samtools mpileup -l {} -d 1000000 --rf 64 --ff UNMAP,QCFAIL -a --output-QNAME -Q 15 {} > {}'.format(U1U11, bam, bam + '_1.pileup')
+        cmd2 = 'samtools mpileup -l {} -d 1000000 --rf 128 --ff UNMAP,QCFAIL -a --output-QNAME -Q 15 {} > {}'.format(U1U11, bam, bam + '_2.pileup')
         run_subprocess(cmd1)
         run_subprocess(cmd2)
-        run_subprocess(cmd3)
         # Process /1 pileup
         results = pileup2dict(bam + '_1.pileup', '/1', results, mstat, umap)
         # Process /2 pileup
         results = pileup2dict(bam + '_2.pileup', '/2', results, mstat, umap)
-        # Process unpair pileup
-        results = pileup2dict(bam + '_3.pileup', '', results, mstat, umap)
     else:
         # No weight
-        cmd = 'samtools mpileup -l {} -d 1000000 --ff UNMAP,QCFAIL,DUP -a -Q 15 {} > {}'.format(U1U11, bam, bam + '.pileup')
+        cmd = 'samtools mpileup -l {} -d 1000000 --ff UNMAP,QCFAIL -a -Q 15 {} > {}'.format(U1U11, bam, bam + '.pileup')
         run_subprocess(cmd)
         # Process pileup
         results = pileup2dict_noweight(bam + '.pileup', results)

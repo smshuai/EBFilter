@@ -197,8 +197,8 @@ if __name__ == '__main__':
             # No variant read
             eb_scores_tumour.append(0)
             eb_scores_normal.append(0)
-            num_normal_p.append(np.nan)
-            num_normal_n.append(np.nan)      
+            num_normal_p.append(-1)
+            num_normal_n.append(-1)      
     res['num_p'] = num_normal_p
     res['num_n'] = num_normal_n
     res['EB_tumour'] = eb_scores_tumour
