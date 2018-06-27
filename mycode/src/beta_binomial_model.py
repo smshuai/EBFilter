@@ -204,10 +204,16 @@ if __name__ == '__main__':
     res['EB_tumour'] = eb_scores_tumour
     res['EB_normal'] = eb_scores_normal
     res['EB_delta'] = res.EB_tumour.subtract(res.EB_normal)
-    Mut = np.logical_and(res.EB_normal<2, res.EB_tumour>5)
-    # Mut = np.logical_and(Mut, res.EB_delta>3)
-    # Mut = np.logical_and(res.EB_normal<3, res.EB_tumour>5)
+    # Assign GT to each pos
     res['GT'] = 'WT'
+    # Mut should have large EB in tumour and small EB in normal
+    # And the difference in EB between tumour and normal should also be large enough
+    Mut = np.logical_and(res.EB_normal<2, res.EB_tumour>5)
+    Mut = np.logical_and(Mut, res.EB_delta>5)
     res.loc[Mut, 'GT'] = 'MUT'
-    res.loc[res.totDP_tumour < 15, 'GT'] = 'undet'
+    # undet should be
+    # 1. not enough depth
+    # 2. uncertain number of var reads in normal
+    res.loc[res.totDP_tumour < 12, 'GT'] = 'undet'
+    res.loc[np.logical_and(Mut, res.varDP_normal>2), 'GT'] = 'undet'
     res.to_csv(out_path, sep='\t', index=False)
