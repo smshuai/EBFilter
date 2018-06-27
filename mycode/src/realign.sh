@@ -12,30 +12,35 @@ U1CORE="/u/sshuai/lab_private/U1U11/gencode.v19.U1U11.nochr.nopseduo.bed"  # Cor
 BW2=bowtie2  # bowtie2
 src_dir="/u/sshuai/lab_private/U1U11/mutational_analysis/EBFilter/mycode/src/"  # Directory for scripts if not in PATH
 BAM2FQ="$src_dir/bam2fq_for_realign.py"  # script for converting bam to fastq
-POSTPROCESS="$src_dir/postprocess_realign.py"  # script for postprocessing
+POSTPROCESS="$src_dir/filter_realn.py"  # script for postprocessing
+READGENE="$src_dir/read_gene_mat.py"
 CALCDP="$src_dir/calc_weighted_depth.py"  # script used to calcuate weighted depth
 
 #################
 ### PART 1
-### Realign reads with MQ<30
+### Realign with bowtie2
 #################
-echo "Make FASTQ for realignments"
+echo "> Make FASTQ for realignments"
 python $BAM2FQ $miniBAM $U1BED $OUT
-echo "Run Bowtie2"
-$BW2 --no-mixed --no-discordant -k 100 --very-sensitive -p 4 -x $BW2IX -1 ${OUT}_1.fq -2 ${OUT}_2.fq -U ${OUT}_unpair.fq -S ${OUT}_realign.sam
-# sort and index
-samtools sort ${OUT}_realign.sam > ${OUT}_realign.bam
-samtools index ${OUT}_realign.bam
+echo "> Run Bowtie2"
+$BW2 --no-mixed --no-discordant -k 100 --very-sensitive -p 4 -x $BW2IX -1 ${OUT}_1.fq -2 ${OUT}_2.fq -S ${OUT}.realn.sam
+samtools view -bh ${OUT}.realn.sam > ${OUT}.realn.bam
 #################
 ### PART 2
-### Post-process re-aligned SAM
+### Filter re-aligned BAM
 #################
-echo "Postprocess SAM"
-python $POSTPROCESS ${OUT}_realign.bam $miniBAM $OUT $U1BED
+echo "> Filter BAM"
+python $POSTPROCESS ${OUT}.realn.bam $OUT
+echo "> Make read X gene matrix"
+python $READGENE ${OUT}.filtered.realn.bam $OUT $U1BED
 #################
 ### PART 3
 ### Make weighted depth table
 #################
-python $CALCDP ${OUT}_processed.bam $U1CORE $donorID ${OUT}_weighted_dp.tsv ${OUT}_mstat.csv ${OUT}_umap.txt
+echo "> Make unweighted depth table"
+python $CALCDP ${OUT}.filtered.realn.bam  $U1CORE $donorID ${OUT}.unweighted.dp.tsv
+echo "> Make weighted depth table"
+python $CALCDP ${OUT}.filtered.realn.bam $U1CORE $donorID ${OUT}.weighted.dp.tsv ${OUT}.mstat.csv
 ## Clean up
-rm ${OUT}_1.fq ${OUT}_2.fq ${OUT}_unpair.fq ${OUT}_realign.sam
+rm ${OUT}*.fq ${OUT}.realn.sam
+
