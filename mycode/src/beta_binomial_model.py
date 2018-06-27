@@ -114,8 +114,8 @@ def test_base(Ks_p, Ns_p, Ks_n, Ns_n, k_pt, n_pt, k_nt, n_nt, k_pn, n_pn, k_nn, 
     k_pt = np.int(k_pt); k_nt = np.int(k_nt); n_pt = np.int(n_pt); n_nt = np.int(n_nt)
     k_pn = np.int(k_pn); k_nn = np.int(k_nn); n_pn = np.int(n_pn); n_nn = np.int(n_nn)
     # Filter Ks and Ns by coverage (>=12 reads) and validity (Ks/Ns < 0.5)
-    keep_p = np.flatnonzero(np.logical_and(Ns_p>=12, Ks_p / (Ns_p + 0.1) < 0.5))
-    keep_n = np.flatnonzero(np.logical_and(Ns_n>=12, Ks_n / (Ns_n + 0.1) < 0.5))
+    keep_p = np.flatnonzero(np.logical_and(Ns_p>=10, Ks_p / (Ns_p + 0.1) < 0.5))
+    keep_n = np.flatnonzero(np.logical_and(Ns_n>=10, Ks_n / (Ns_n + 0.1) < 0.5))
     # Don't need too many training normals
     keep_p = np.random.choice(keep_p, N_normal, replace=False) if keep_p.shape[0] > N_normal else keep_p
     keep_n = np.random.choice(keep_n, N_normal, replace=False) if keep_n.shape[0] > N_normal else keep_n
@@ -209,5 +209,5 @@ if __name__ == '__main__':
     # Mut = np.logical_and(res.EB_normal<3, res.EB_tumour>5)
     res['GT'] = 'WT'
     res.loc[Mut, 'GT'] = 'MUT'
-    res.loc[res.totDP_tumour < 12, 'GT'] = 'undet'
+    res.loc[res.totDP_tumour < 10, 'GT'] = 'undet'
     res.to_csv(out_path, sep='\t', index=False)

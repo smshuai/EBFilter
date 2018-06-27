@@ -52,42 +52,27 @@ def get_weights(depth, readBar, ct):
     assert len(weights) == len(readBar)
     return(weights)
 
-def varWeightedCountCheck(var, depth, baseBar, weights, verbose):
-    if depth == 0: return [0,0,0,0]
-
-    insertion_p, insertion_n, deletion_p, deletion_n = 0, 0, 0, 0
+def prepWeightedCountCheck(baseBar, weights):
     insertion_vb_p, insertion_vb_n, deletion_vb_p, deletion_vb_n = 0, 0, 0, 0
-    
     # fix indels in baseBar
     deleted = 0
     iter = ReIndel.finditer(baseBar)
     for m in iter:
         site = m.start()
-        type = m.group(1)
+        indelType = m.group(1)
         indelSize = m.group(2)
         varChar = m.group(3)[0:int(indelSize)]
-        var_match = False
-        if var[0] == "-":
-            # for deletion, just checking the size is OK
-            if len(var[1:]) == len(varChar):
-                var_match = True
-        elif var[1:].upper() == varChar.upper():
-            var_match = True
         strand = '+' if varChar.isupper() else '-'
-        if type == "+":
+        if indelType == "+":
             if strand == "+":
                 insertion_vb_p += 1
-                if var_match: insertion_p += 1
             else:
                 insertion_vb_n += 1
-                if var_match: insertion_n += 1
         else:
             if strand == "+":
                 deletion_vb_p += 1
-                if var_match: deletion_p += 1
             else:
                 deletion_vb_n += 1
-                if var_match: deletion_n += 1
         baseBar = baseBar[0:(site - deleted)] + baseBar[(site + int(indelSize) + len(indelSize) + 1 - deleted):]
         deleted += 1 + len(indelSize) + int(indelSize)
     # Remove start and end info in baseBar
@@ -97,15 +82,26 @@ def varWeightedCountCheck(var, depth, baseBar, weights, verbose):
     assert len(baseBar) == len(weights), "lengths of bases and weights are different!"
     base_num_weighted = {"A": 0, "C": 0, "G": 0, "T": 0, "N": 0, "a": 0, "c": 0, "g": 0, "t": 0, "n": 0}
     base_num = {"A": 0, "C": 0, "G": 0, "T": 0, "N": 0, "a": 0, "c": 0, "g": 0, "t": 0, "n": 0}
+    raw_dict = {"A": [], "C": [], "G": [], "T": [], "N": [], "a": [], "c": [], "g": [], "t": [], "n": []}
     # rely on -Q option in samtools; base quality check is removed
-    if var in "ACGTacgt":
-        for base, w in zip(baseBar, weights):
-            if base in "ATGCNatgcn":
-                base_num_weighted[base] += 1/w if w>0 else 0  # the most importane line; weight each base by its times of mapping
-                base_num[base] += 1 if w>0 else 0  # unweighted version
-    # Depth is calcuated with weighted version
-    depth_p = base_num_weighted["A"] + base_num_weighted["C"] + base_num_weighted["G"] + base_num_weighted["T"] + base_num_weighted["N"]
-    depth_n = base_num_weighted["a"] + base_num_weighted["c"] + base_num_weighted["g"] + base_num_weighted["t"] + base_num_weighted["n"]
+    for base, w in zip(baseBar, weights):
+        if base in "ATGCNatgcn":
+            base_num_weighted[base] += 1/w if w>0 else 0  # the most importane line; weight each base by its times of mapping
+            base_num[base] += 1 if w>0 else 0  # unweighted version
+            raw_dict[base].append(str(w))
+    raw_dict = pd.Series(raw_dict).apply(lambda x: ",".join(x))
+    return base_num_weighted, base_num, raw_dict, insertion_vb_n, insertion_vb_p, deletion_vb_n, deletion_vb_p
+
+
+def varWeightedCountCheck(var, base_num_weighted, base_num, weighted):
+    if weighted:
+        # Depth is calcuated with weighted version
+        depth_p = base_num_weighted["A"] + base_num_weighted["C"] + base_num_weighted["G"] + base_num_weighted["T"] + base_num_weighted["N"]
+        depth_n = base_num_weighted["a"] + base_num_weighted["c"] + base_num_weighted["g"] + base_num_weighted["t"] + base_num_weighted["n"]
+    else:
+        # unweighted
+        depth_p = base_num["A"] + base_num["C"] + base_num["G"] + base_num["T"] + base_num["N"]
+        depth_n = base_num["a"] + base_num["c"] + base_num["g"] + base_num["t"] + base_num["n"]
     misMatch_p = 0
     misMatch_n = 0
     # Mismatch depth is calcuated with unweighted version
@@ -113,23 +109,17 @@ def varWeightedCountCheck(var, depth, baseBar, weights, verbose):
         # variant is SNV
         misMatch_p = base_num[var.upper()]
         misMatch_n = base_num[var.lower()]
+    elif var[0] == "+":
+        # variant is INS
+        misMatch_p, misMatch_n = insertion_vb_p, insertion_vb_n
+    elif var[0] == "-":
+        # variant is DEL
+        misMatch_p, misMatch_n = deletion_vb_p, deletion_vb_n
     else:
-        if var[0] == "+":
-            # variant is INS
-            if verbose == True:
-                misMatch_p, misMatch_n = insertion_vb_p, insertion_vb_n
-            else:
-                misMatch_p, misMatch_n = insertion_p, insertion_n
-        elif var[0] == "-":
-            # variant is DEL
-            if verbose == True:
-                misMatch_p, misMatch_n = deletion_vb_p, deletion_vb_n
-            else:
-                misMatch_p, misMatch_n = deletion_p, deletion_n
-        else:
-            sys.stderr.write(var + ": input var has wrong format!")
-            sys.exit(1)
-    return [int(misMatch_p), int(depth_p), int(misMatch_n), int(depth_n)]
+        sys.stderr.write(var + ": input var has wrong format!")
+        sys.exit(1)
+    return [int(misMatch_p), int(np.ceil(depth_p)), int(misMatch_n), int(np.ceil(depth_n))]
+
 
 def run_subprocess(cmd):
     exit_status = subprocess.call(cmd, shell=True)
@@ -137,37 +127,55 @@ def run_subprocess(cmd):
         sys.stderr.write('Failed:', cmd)
         sys.exit(1)
 
+
 def pileup2dict(pileup, mate_order, results, mstat):
     with open(pileup) as f:
         for pp in f:
             (chrom, pos, _, depth, baseBar, _, readBar) = pp.strip().split('\t')
             depth = int(depth)
-            readBar = [i + mate_order for i in readBar.split(',')]
-            weights = get_weights(depth, readBar, mstat)
-            for var in 'ACGT':
-                key = (chrom, pos, var)
-                counts = varWeightedCountCheck(var, depth, baseBar, weights, False)
-                results[key] = np.add(results.get(key, [0, 0, 0, 0]), counts).tolist()
+            if depth > 0:
+                readBar = [i + mate_order for i in readBar.split(',')]
+                weights = get_weights(depth, readBar, mstat)
+                base_num_weighted, base_num, raw_dict, insertion_vb_n, insertion_vb_p, deletion_vb_n, deletion_vb_p = prepWeightedCountCheck(baseBar, weights)
+                for var in 'ACGT':
+                    key = (chrom, pos, var)
+                    counts = varWeightedCountCheck(var, base_num_weighted, base_num, weighted=True)
+                    # use multiple pileup files, so need to perform addition
+                    results[key] = np.add(results.get(key, [0, 0, 0, 0]), counts).tolist()
+            else:
+                for var in 'ACGT':
+                    key = (chrom, pos, var)
+                    counts = [0, 0, 0, 0]
+                    results[key] = np.add(results.get(key, [0, 0, 0, 0]), counts).tolist()
     return results
+
 
 def pileup2dict_noweight(pileup, results):
     with open(pileup) as f:
         for pp in f:
             (chrom, pos, _, depth, baseBar, qualBar) = pp.strip().split('\t')
             depth = int(depth)
-            weights = [1 for i in qualBar]
-            for var in 'ACGT':
-                key = (chrom, pos, var)
-                counts = varWeightedCountCheck(var, depth, baseBar, weights, False)
-                results[key] = np.add(results.get(key, [0, 0, 0, 0]), counts).tolist()
+            if depth > 0:
+                weights = [1 for i in qualBar]
+                base_num_weighted, base_num, raw_dict, _, _, _, _ = prepWeightedCountCheck(baseBar, weights)
+                for var in 'ACGT':
+                    key = (chrom, pos, var)
+                    counts = varWeightedCountCheck(var, base_num_weighted, base_num, weighted=False)
+                    results[key] = np.add(results.get(key, [0, 0, 0, 0]), counts).tolist()
+            else:
+                for var in 'ACGT':
+                    key = (chrom, pos, var)
+                    counts = [0, 0, 0, 0]
+                    results[key] = np.add(results.get(key, [0, 0, 0, 0]), counts).tolist()
     return results
+
 
 if __name__ == '__main__':
     # Get arguments
     bam, mstat, U1U11, donor_id, out_path, use_weight = process_args()
     results = dict()
     if use_weight is 'yes':
-        # Make three pileup files (/1, /2, unpair)
+        # Make two pileup files (/1, /2)
         cmd1 = 'samtools mpileup -l {} -d 1000000 --rf 64 --ff UNMAP,QCFAIL -a --output-QNAME -Q 15 {} > {}'.format(U1U11, bam, bam + '_1.pileup')
         cmd2 = 'samtools mpileup -l {} -d 1000000 --rf 128 --ff UNMAP,QCFAIL -a --output-QNAME -Q 15 {} > {}'.format(U1U11, bam, bam + '_2.pileup')
         run_subprocess(cmd1)
