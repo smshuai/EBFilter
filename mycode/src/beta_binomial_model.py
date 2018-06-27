@@ -204,10 +204,10 @@ if __name__ == '__main__':
     res['EB_tumour'] = eb_scores_tumour
     res['EB_normal'] = eb_scores_normal
     res['EB_delta'] = res.EB_tumour.subtract(res.EB_normal)
-    Mut = np.logical_and(res.EB_normal<3, res.EB_tumour>5)
-    Mut = np.logical_and(Mut, res.EB_delta>3)
+    Mut = np.logical_and(res.EB_normal<2, res.EB_tumour>5)
+    # Mut = np.logical_and(Mut, res.EB_delta>3)
     # Mut = np.logical_and(res.EB_normal<3, res.EB_tumour>5)
     res['GT'] = 'WT'
     res.loc[Mut, 'GT'] = 'MUT'
-    res.loc[res.totDP_tumour < 10, 'GT'] = 'undet'
+    res.loc[res.totDP_tumour < 15, 'GT'] = 'undet'
     res.to_csv(out_path, sep='\t', index=False)
